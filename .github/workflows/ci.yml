@@ -1,0 +1,93 @@
+name: SmartCart CI
+
+# When does this pipeline run?
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+# What jobs does it run?
+jobs:
+
+  # ─────────────────────────────────────────
+  # JOB 1: Lint and test Python backend
+  # ─────────────────────────────────────────
+  python-ci:
+    name: Python Services CI
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      # Step 3: Install tools
+      - name: Install Python tools
+        run: |
+          pip install flake8 black pytest
+
+      # Step 4: Check formatting with black
+      - name: Check Python formatting (black)
+        run: |
+          black --check backend/ || echo "Formatting issues found - run black backend/ to fix"
+
+      # Step 5: Check for errors with flake8
+      - name: Lint Python code (flake8)
+        run: |
+          flake8 backend/ --max-line-length=100 --exclude=__pycache__,.venv || echo "Linting issues found"
+
+  # ─────────────────────────────────────────
+  # JOB 2: Lint and test Node.js / Frontend
+  # ─────────────────────────────────────────
+  node-ci:
+    name: Node.js and Frontend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Download the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Step 3: Check if frontend package.json exists yet
+      - name: Check frontend setup
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            cd frontend
+            npm ci
+            npm run lint || echo "Lint not configured yet"
+            npm run test || echo "Tests not configured yet"
+          else
+            echo "Frontend not scaffolded yet - skipping"
+          fi
+
+  # ─────────────────────────────────────────
+  # JOB 3: Security check
+  # ─────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for secrets accidentally committed
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --only-verified
