@@ -1,0 +1,97 @@
+
+
+# ─────────────────────────────────────────────────────────
+# SmartCart Local Development Environment
+# Run with: docker-compose up
+# Stop with: docker-compose down
+# Stop and delete data: docker-compose down -v
+# ─────────────────────────────────────────────────────────
+
+services:
+
+  # ─────────────────────────────────────────
+  # PostgreSQL — Primary Database
+  # Connection: postgresql://smartcart:smartcart@localhost:5432/smartcart
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: smartcart-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: smartcart
+      POSTGRES_PASSWORD: smartcart
+      POSTGRES_DB: smartcart
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartcart"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Redis — Cache and Pub/Sub
+  # Connection: redis://localhost:6379
+  # ─────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: smartcart-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # Elasticsearch — Search Engine
+  # Connection: http://localhost:9200
+  # ─────────────────────────────────────────
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: smartcart-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ─────────────────────────────────────────
+  # pgAdmin — PostgreSQL Visual UI
+  # Open in browser: http://localhost:5050
+  # Login: admin@smartcart.com / admin
+  # ─────────────────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: smartcart-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@smartcart.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+
+# ─────────────────────────────────────────
+# Named volumes — data persists between restarts
+# ─────────────────────────────────────────
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
